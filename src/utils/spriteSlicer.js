@@ -1,7 +1,49 @@
 /* eslint-disable no-unused-vars */
 
 const DEBUG = true;
-if (DEBUG) console.log('DEBUG MODE IS ON!!!');
+const log = (...args) => DEBUG && console.log(...args);
+log('DEBUG MODE IS ON!!!');
+
+export const ALPHA_THRESHOLD = 10;
+export const SPRITE_SLICER_VERSION = '1.0.0';
+
+export const DEFAULT_OPTIONS = {
+    // Slicing & Cropping
+    removePadding: false,           // Whether to trim padding from each sprite
+    paddingColor: 'transparent',    // Color to treat as padding (ignored if mode is 'transparent')
+    maintainAspectRatio: false,     // (if used in UI later)
+
+    // Detection Settings
+    mode: 'transparent',            // 'transparent', 'color', or 'edge'
+    backgroundColor: [255, 255, 255], // Used in 'color' mode to match solid padding
+    tolerance: 20,                  // RGB distance tolerance for solid background detection
+    minWidth: 8,                    // Minimum width of a sprite for detection
+    minHeight: 8,                   // Minimum height of a sprite for detection
+    maxSprites: 1000,               // Prevents runaway detection
+    mergeTouchingSprite: false,    // (Future feature for combining adjacent boxes)
+    algorithm: 'floodfill',         // 'floodfill' or 'connected_components'
+
+    // Export Settings
+    batchSize: 5,                   // Number of sprites processed at once
+    format: 'png',                  // Export image format: 'png', 'jpeg', 'webp'
+    quality: 0.92,                  // Used for lossy formats (jpeg/webp)
+    prefix: 'sprite',              // Filename prefix for exported files
+    namingPattern: 'row_col',       // 'row_col', 'sequential', or 'custom'
+    customNamer: null,             // Optional function (row, col, index) => string
+
+    // Sorting / Output Behavior
+    sortBy: 'position',             // 'position', 'size', or 'area'
+    cropToContent: true,            // Whether to crop detected boxes after slicing
+
+    // Grid slicing (only used in `splitBox`)
+    roundToPixels: true,           // Round output boxes to integers
+    distributeRemainder: true,     // Distribute leftover pixels across cells
+
+    // Callbacks
+    onProgress: null,
+    onComplete: null,
+    onError: null,
+};
 
 /**
  * Extracts a single sprite from the canvas with optional padding removal.
@@ -53,12 +95,12 @@ export function sliceSprite(canvas, row, col, totalRows, totalCols, options = {}
             backgroundColor: paddingColor === 'transparent' ? null : paddingColor
         });
     }
-
-    if (DEBUG) {
-        console.log(`Sliced sprite at (${row}, ${col}): ${width}x${height} -> ${offscreen.width}x${offscreen.height}`);
-    }
-
+    log(`Sliced sprite at (${row}, ${col}): ${width}x${height} -> ${offscreen.width}x${offscreen.height}`);
     return offscreen;
+}
+
+export function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 export function isBackground(x, y, width, data, backgroundColor, tolerance, mode) {
@@ -68,7 +110,7 @@ export function isBackground(x, y, width, data, backgroundColor, tolerance, mode
     const b = data[i + 2];
     const a = data[i + 3];
 
-    if (mode === 'transparent') return a < 10;
+    if (mode === 'transparent') return a < ALPHA_THRESHOLD;
 
     if (backgroundColor) {
         const [bgR, bgG, bgB] = backgroundColor;
@@ -78,6 +120,7 @@ export function isBackground(x, y, width, data, backgroundColor, tolerance, mode
             Math.abs(b - bgB) <= tolerance
         );
     }
+    return false;
 }
 
 /**
@@ -219,30 +262,16 @@ export async function processSprite(row, col, i, canvas, rows, cols, options) {
         customNamer = null
     } = options;
 
-    const totalSprites = rows * cols;
-    let processed = 0;
-    let errors = [];
-
     try {
         const spriteCanvas = sliceSprite(canvas, row, col, rows, cols, {
             removePadding,
             mode
         });
-
         const blob = await canvasToBlob(spriteCanvas, format, quality);
-
         const filename = generateFilename(prefix, row, col, i, namingPattern, customNamer, format);
-
         downloadBlob(blob, filename);
-        processed++;
-
-        if (onProgress) {
-            onProgress(processed, totalSprites, filename);
-        }
-
         return { success: true, filename };
     } catch (error) {
-        errors.push({ row, col, error: error.message });
         if (onError) onError(error, row, col);
         return { success: false, row, col, error };
     }
@@ -278,9 +307,7 @@ export async function exportAllSprites(canvas, rows, cols, options = {}) {
                 batchPromises.push(processSprite(row, col, i, canvas, rows, cols, options));
             }
             await Promise.all(batchPromises);
-            if (batchEnd < totalSprites) {
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
+            if (batchEnd < totalSprites) await sleep(50);
         }
         if (onComplete) onComplete(processed, errors);
         return { processed, errors };
@@ -317,7 +344,6 @@ export function generateFilename(prefix, row, col, index, pattern, customNamer, 
  */
 export function detectSpriteBounds(canvas, options = {}) {
     options = {
-        ...options,
         mode: 'transparent', // 'transparent', 'color', 'edge'
         backgroundColor: [255, 255, 255],
         tolerance: 20,
@@ -325,7 +351,8 @@ export function detectSpriteBounds(canvas, options = {}) {
         minHeight: 8,
         maxSprites: 1000,
         mergeTouchingSprite: false,
-        algorithm: 'floodfill' // 'floodfill', 'connected_components'
+        algorithm: 'floodfill', // 'floodfill', 'connected_components'
+        ...options,
     };
 
     if (options.algorithm === 'connected_components') {
