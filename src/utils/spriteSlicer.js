@@ -17,7 +17,7 @@ export function sliceSprite(canvas, row, col, totalRows, totalCols, options = {}
     const {
         removePadding = false,
         paddingColor = 'transparent',
-        cropTransparent = false,
+        mode = 'color', // 'transparent', 'color', 'edge'
         maintainAspectRatio = false
     } = options;
 
@@ -36,7 +36,10 @@ export function sliceSprite(canvas, row, col, totalRows, totalCols, options = {}
         height = canvas.height - y; // Last row gets remaining pixels
     }
 
-    let offscreen = document.createElement('canvas');
+    let offscreen = typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(width, height)
+        : document.createElement('canvas');
+
     offscreen.width = width;
     offscreen.height = height;
 
@@ -44,9 +47,9 @@ export function sliceSprite(canvas, row, col, totalRows, totalCols, options = {}
     ctx.drawImage(canvas, x, y, width, height, 0, 0, width, height);
 
     // Post-processing options
-    if (removePadding || cropTransparent) {
+    if (removePadding || mode === 'transparent') {
         offscreen = cropCanvas(offscreen, {
-            cropTransparent,
+            mode,
             backgroundColor: paddingColor === 'transparent' ? null : paddingColor
         });
     }
@@ -58,6 +61,25 @@ export function sliceSprite(canvas, row, col, totalRows, totalCols, options = {}
     return offscreen;
 }
 
+export function isBackground(x, y, width, data, backgroundColor, tolerance, mode) {
+    const i = (y * width + x) * 4;
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    const a = data[i + 3];
+
+    if (mode === 'transparent') return a < 10;
+
+    if (backgroundColor) {
+        const [bgR, bgG, bgB] = backgroundColor;
+        return (
+            Math.abs(r - bgR) <= tolerance &&
+            Math.abs(g - bgG) <= tolerance &&
+            Math.abs(b - bgB) <= tolerance
+        );
+    }
+}
+
 /**
  * Crops a canvas to remove transparent or solid color padding.
  * @param {HTMLCanvasElement} canvas - Canvas to crop.
@@ -66,7 +88,7 @@ export function sliceSprite(canvas, row, col, totalRows, totalCols, options = {}
  */
 export function cropCanvas(canvas, options = {}) {
     const {
-        cropTransparent = true,
+        mode = 'transparent',
         backgroundColor = null,
         tolerance = 10,
         minWidth = 1,
@@ -77,33 +99,12 @@ export function cropCanvas(canvas, options = {}) {
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const { data, width, height } = imageData;
 
-    const isBackgroundPixel = (x, y) => {
-        const i = (y * width + x) * 4;
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        const a = data[i + 3];
-
-        if (cropTransparent && a < 10) return true;
-
-        if (backgroundColor) {
-            const [bgR, bgG, bgB] = backgroundColor;
-            return (
-                Math.abs(r - bgR) <= tolerance &&
-                Math.abs(g - bgG) <= tolerance &&
-                Math.abs(b - bgB) <= tolerance
-            );
-        }
-
-        return false;
-    };
-
     // Find content bounds
     let minX = width, minY = height, maxX = -1, maxY = -1;
 
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            if (!isBackgroundPixel(x, y)) {
+            if (!isBackground(x, y, width, data, backgroundColor, tolerance, mode)) {
                 minX = Math.min(minX, x);
                 minY = Math.min(minY, y);
                 maxX = Math.max(maxX, x);
@@ -144,6 +145,16 @@ export function cropCanvas(canvas, options = {}) {
 export function canvasToBlob(canvas, format = 'png', quality = 0.92) {
     return new Promise((resolve, reject) => {
         const mimeType = `image/${format}`;
+
+        if (!canvas.toBlob) {
+            // Fallback for old browsers (if needed)
+            const dataUrl = canvas.toDataURL(`image/${format}`, quality);
+            const byteString = atob(dataUrl.split(',')[1]);
+            const mimeString = dataUrl.split(',')[0].split(':')[1].split(';')[0];
+            const buffer = new Uint8Array(byteString.length);
+            for (let i = 0; i < byteString.length; i++) buffer[i] = byteString.charCodeAt(i);
+            return resolve(new Blob([buffer], { type: mimeString }));
+        }
 
         try {
             canvas.toBlob((blob) => {
@@ -195,6 +206,48 @@ export function downloadBlob(blob, filename, onProgress = null) {
     }
 }
 
+export async function processSprite(row, col, i, canvas, rows, cols, options) {
+    const {
+        format = 'png',
+        quality = 0.92,
+        prefix = 'sprite',
+        removePadding = false,
+        mode = 'transparent',
+        onProgress = null,
+        onError = null,
+        namingPattern = 'row_col', // 'row_col', 'sequential', 'custom'
+        customNamer = null
+    } = options;
+
+    const totalSprites = rows * cols;
+    let processed = 0;
+    let errors = [];
+
+    try {
+        const spriteCanvas = sliceSprite(canvas, row, col, rows, cols, {
+            removePadding,
+            mode
+        });
+
+        const blob = await canvasToBlob(spriteCanvas, format, quality);
+
+        const filename = generateFilename(prefix, row, col, i, namingPattern, customNamer, format);
+
+        downloadBlob(blob, filename);
+        processed++;
+
+        if (onProgress) {
+            onProgress(processed, totalSprites, filename);
+        }
+
+        return { success: true, filename };
+    } catch (error) {
+        errors.push({ row, col, error: error.message });
+        if (onError) onError(error, row, col);
+        return { success: false, row, col, error };
+    }
+}
+
 /**
  * Enhanced sprite export with batch processing and progress tracking.
  * @param {HTMLCanvasElement} canvas - Full spritesheet canvas.
@@ -204,17 +257,9 @@ export function downloadBlob(blob, filename, onProgress = null) {
  */
 export async function exportAllSprites(canvas, rows, cols, options = {}) {
     const {
-        format = 'png',
-        quality = 0.92,
-        prefix = 'sprite',
-        removePadding = false,
-        cropTransparent = false,
         batchSize = 5, // Process in batches to avoid overwhelming the browser
-        onProgress = null,
         onComplete = null,
         onError = null,
-        namingPattern = 'row_col', // 'row_col', 'sequential', 'custom'
-        customNamer = null
     } = options;
 
     const totalSprites = rows * cols;
@@ -230,51 +275,15 @@ export async function exportAllSprites(canvas, rows, cols, options = {}) {
             for (let i = batchStart; i < batchEnd; i++) {
                 const row = Math.floor(i / cols);
                 const col = i % cols;
-
-                const promise = (async () => {
-                    try {
-                        const spriteCanvas = sliceSprite(canvas, row, col, rows, cols, {
-                            removePadding,
-                            cropTransparent
-                        });
-
-                        const blob = await canvasToBlob(spriteCanvas, format, quality);
-
-                        const filename = generateFilename(prefix, row, col, i, namingPattern, customNamer, format);
-
-                        downloadBlob(blob, filename);
-                        processed++;
-
-                        if (onProgress) {
-                            onProgress(processed, totalSprites, filename);
-                        }
-
-                        return { success: true, filename };
-                    } catch (error) {
-                        errors.push({ row, col, error: error.message });
-                        if (onError) onError(error, row, col);
-                        return { success: false, row, col, error };
-                    }
-                })();
-
-                batchPromises.push(promise);
+                batchPromises.push(processSprite(row, col, i, canvas, rows, cols, options));
             }
-
-            // Wait for current batch to complete before starting next
             await Promise.all(batchPromises);
-
-            // Small delay between batches to prevent browser lockup
             if (batchEnd < totalSprites) {
                 await new Promise(resolve => setTimeout(resolve, 50));
             }
         }
-
-        if (onComplete) {
-            onComplete(processed, errors);
-        }
-
+        if (onComplete) onComplete(processed, errors);
         return { processed, errors };
-
     } catch (error) {
         if (onError) onError(error);
         throw error;
@@ -284,7 +293,7 @@ export async function exportAllSprites(canvas, rows, cols, options = {}) {
 /**
  * Generate filename based on naming pattern.
  */
-function generateFilename(prefix, row, col, index, pattern, customNamer, format) {
+export function generateFilename(prefix, row, col, index, pattern, customNamer, format) {
     const ext = `.${format}`;
 
     if (customNamer && typeof customNamer === 'function') {
@@ -329,7 +338,7 @@ export function detectSpriteBounds(canvas, options = {}) {
 /**
  * Original flood-fill algorithm (optimized).
  */
-function detectBoundsFloodFill(canvas, options) {
+export function detectBoundsFloodFill(canvas, options) {
     const {
         mode = 'transparent',
         backgroundColor = [255, 255, 255],
@@ -345,24 +354,6 @@ function detectBoundsFloodFill(canvas, options) {
     const visited = new Uint8Array(width * height); // More memory efficient
     const boxes = [];
 
-    const isBackground = (x, y) => {
-        const i = (y * width + x) * 4;
-        const r = imageData[i];
-        const g = imageData[i + 1];
-        const b = imageData[i + 2];
-        const a = imageData[i + 3];
-
-        if (mode === 'transparent') {
-            return a < 10;
-        } else {
-            return (
-                Math.abs(r - backgroundColor[0]) <= tolerance &&
-                Math.abs(g - backgroundColor[1]) <= tolerance &&
-                Math.abs(b - backgroundColor[2]) <= tolerance
-            );
-        }
-    };
-
     function floodFill(startX, startY) {
         const stack = [[startX, startY]];
         let box = { left: startX, top: startY, right: startX, bottom: startY };
@@ -373,7 +364,7 @@ function detectBoundsFloodFill(canvas, options) {
             const index = y * width + x;
 
             if (x < 0 || y < 0 || x >= width || y >= height) continue;
-            if (visited[index] || isBackground(x, y)) continue;
+            if (visited[index] || isBackground(x, y, width, imageData, backgroundColor, tolerance, mode)) continue;
 
             visited[index] = 1;
             pixelCount++;
@@ -394,7 +385,7 @@ function detectBoundsFloodFill(canvas, options) {
     for (let y = 0; y < height && boxes.length < maxSprites; y++) {
         for (let x = 0; x < width && boxes.length < maxSprites; x++) {
             const index = y * width + x;
-            if (!visited[index] && !isBackground(x, y)) {
+            if (!visited[index] && !isBackground(x, y, width, imageData, backgroundColor, tolerance, mode)) {
                 const box = floodFill(x, y);
                 const boxWidth = box.right - box.left + 1;
                 const boxHeight = box.bottom - box.top + 1;
@@ -435,28 +426,10 @@ function detectBoundsConnectedComponents(canvas, options) {
     // Create binary mask
     const mask = new Uint8Array(width * height);
 
-    const isBackground = (x, y) => {
-        const i = (y * width + x) * 4;
-        const r = imageData[i];
-        const g = imageData[i + 1];
-        const b = imageData[i + 2];
-        const a = imageData[i + 3];
-
-        if (mode === 'transparent') {
-            return a < 10;
-        } else {
-            return (
-                Math.abs(r - backgroundColor[0]) <= tolerance &&
-                Math.abs(g - backgroundColor[1]) <= tolerance &&
-                Math.abs(b - backgroundColor[2]) <= tolerance
-            );
-        }
-    };
-
     // Fill binary mask
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
-            mask[y * width + x] = isBackground(x, y) ? 0 : 1;
+            mask[y * width + x] = isBackground(x, y, width, imageData, backgroundColor, tolerance, mode) ? 0 : 1;
         }
     }
 
@@ -565,7 +538,10 @@ export function sliceSpritesFromCanvas(canvas, options = {}) {
     }
 
     return boxes.map((box, index) => {
-        const offscreen = document.createElement('canvas');
+        const offscreen = typeof OffscreenCanvas !== 'undefined'
+            ? new OffscreenCanvas(box.width, box.height)
+            : document.createElement('canvas');
+
         offscreen.width = box.width;
         offscreen.height = box.height;
         const ctx = offscreen.getContext('2d');
@@ -573,7 +549,7 @@ export function sliceSpritesFromCanvas(canvas, options = {}) {
 
         let finalCanvas = offscreen;
         if (cropToContent) {
-            finalCanvas = cropCanvas(offscreen, { cropTransparent: true });
+            finalCanvas = cropCanvas(offscreen, { mode: 'transparent' });
         }
 
         return {
