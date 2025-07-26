@@ -564,7 +564,7 @@ export function sliceSpritesFromCanvas(canvas, options = {}) {
         boxes.sort((a, b) => (b.width * b.height) - (a.width * a.height));
     }
 
-    const sprites = boxes.map((box, index) => {
+    return boxes.map((box, index) => {
         const offscreen = document.createElement('canvas');
         offscreen.width = box.width;
         offscreen.height = box.height;
@@ -582,8 +582,6 @@ export function sliceSpritesFromCanvas(canvas, options = {}) {
             index
         };
     });
-
-    return sprites;
 }
 
 /**

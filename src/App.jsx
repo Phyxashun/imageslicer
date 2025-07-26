@@ -18,7 +18,7 @@ export default function App() {
 
     return (
         <div className="app-container">
-            <img className="full-logo" src={full_logo} />
+            <img className="full-logo" src={full_logo} alt="logo" />
             <ImageDropZone onImageLoad={handleImageLoad} />
             {imageBitmap && (
                 <>
