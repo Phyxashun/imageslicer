@@ -50,17 +50,21 @@ export default function App() {
 */
 
 import React, { useState } from "react";
-import { ThemeProvider, useTheme } from "./components/ThemeProvider";
+import { ThemeProvider, useTheme, useThemeUpdate } from "./components/ThemeContext.jsx";
 import ControlsPanel from "./components/ControlsPanel";
 import SpriteCanvas from "./components/SpriteCanvas";
 
 const AppContent = () => {
     const [image, setImage] = useState(null);
     const [dividers, setDividers] = useState({ vertical: [], horizontal: [] });
-    const { toggleTheme, theme } = useTheme();
+    const theme = useTheme();
+    const toggleTheme = useThemeUpdate();
+
+    const appClass = (theme === "dark") ? "theme-dark" : "theme-light";
+    console.log("APP CLASS:", appClass);
 
     return (
-        <div className="container mt-5">
+        <div className={appClass}>
             <div className="buttons is-right">
                 <button className="button is-small is-dark" onClick={toggleTheme}>
                     Toggle Theme
