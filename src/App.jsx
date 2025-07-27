@@ -18,8 +18,8 @@ export default function App() {
     };
 
     return (
-        <div className="app-container">
-            <img className="full-logo" src={full_logo} alt="logo" />
+        <div className='app-container'>
+            <img className='full-logo' src={full_logo} alt='logo' />
             <ImageDropZone onImageLoad={handleImageLoad} />
             {imageBitmap && (
                 <>
@@ -29,11 +29,11 @@ export default function App() {
                         spriteGrid={spriteGrid}
                         setSpriteGrid={setSpriteGrid}
                         showGrid={false}
-                        gridColor="lime"
+                        gridColor='lime'
                         maxWidth={imageBitmap.width}
                         maxHeight={imageBitmap.height}
                         enablePreview={true}
-                        exportFormat="PNG"
+                        exportFormat='PNG'
                         exportQuality={100}
 
                     />
@@ -49,10 +49,11 @@ export default function App() {
 }
 */
 
-import React, { useState } from "react";
-import { ThemeProvider, useTheme, useThemeUpdate } from "./components/ThemeContext.jsx";
-import ControlsPanel from "./components/ControlsPanel";
-import SpriteCanvas from "./components/SpriteCanvas";
+import React, { useState } from 'react';
+import { ThemeProvider, useTheme, useThemeUpdate } from './components/ThemeContext.jsx';
+import ControlsPanel from './components/ControlsPanel';
+import SpriteCanvas from './components/SpriteCanvas';
+import full_logo from '/full_logo.png';
 
 const AppContent = () => {
     const [image, setImage] = useState(null);
@@ -60,26 +61,37 @@ const AppContent = () => {
     const theme = useTheme();
     const toggleTheme = useThemeUpdate();
 
-    const appClass = (theme === "dark") ? "theme-dark" : "theme-light";
-    console.log("APP CLASS:", appClass);
+    let appClass = 'container is-widescreen';
+    appClass += (theme === 'dark') ? 'theme-dark' : 'theme-light';
+    console.log('APP CLASS:', appClass);
 
     return (
         <div className={appClass}>
-            <div className="buttons is-right">
-                <button className="button is-small is-dark" onClick={toggleTheme}>
+            <div className='buttons is-right'>
+                <button className='button is-small is-dark' onClick={toggleTheme}>
                     Toggle Theme
                 </button>
             </div>
-            <div className="columns">
-                <div className="column is-one-third">
+            <section className='hero'>
+                <div className='hero-body'>
+                    <div className='title'>
+                        <figure className='image is-128x128 is-centered'>
+                            <img src={full_logo} alt='logo'/>
+                        </figure>
+                    </div>
+                    <div className='subtitle'>Image Slicer and Dicer v1.0</div>
+                </div>
+            </section>
+            <div className='container is-fluid'>
+                <div className='container is-fluid'>
                     <ControlsPanel
                         onImageLoad={setImage}
                         dividers={dividers}
                         setDividers={setDividers}
                     />
                 </div>
-                <div className="column">
-                    <SpriteCanvas image={image} dividers={dividers} setDividers={setDividers} />
+                <div className='container is-fluid'>
+                    <SpriteCanvas image={image} dividers={dividers} setDividers={setDividers}/>
                 </div>
             </div>
         </div>
@@ -88,7 +100,7 @@ const AppContent = () => {
 
 const App = () => (
     <ThemeProvider>
-        <AppContent />
+        <AppContent/>
     </ThemeProvider>
 );
 
