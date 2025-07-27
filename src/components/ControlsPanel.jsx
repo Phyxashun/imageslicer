@@ -1,3 +1,4 @@
+/*
 import React from 'react';
 import { sliceSpritesFromCanvas, canvasToPNGBlob, downloadBlob } from '../utils/spriteSlicer';
 
@@ -48,3 +49,43 @@ export default function ControlsPanel({ canvasRef, spriteGrid, setSpriteGrid }) 
         </div>
     );
 }
+*/
+
+import React from "react";
+
+const ControlsPanel = ({ onImageLoad, dividers, setDividers }) => {
+    const handleUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const img = new Image();
+            img.onload = () => onImageLoad(img);
+            img.src = URL.createObjectURL(file);
+        }
+    };
+
+    const addDivider = (type) => {
+        const newPos = 100 + dividers[type].length * 50;
+        setDividers(prev => ({
+            ...prev,
+            [type]: [...prev[type], newPos]
+        }));
+    };
+
+    return (
+        <div className="box">
+            <div className="field">
+                <label className="label">Upload Sprite Sheet</label>
+                <div className="control">
+                    <input className="input" type="file" onChange={handleUpload} />
+                </div>
+            </div>
+
+            <div className="buttons">
+                <button className="button is-link" onClick={() => addDivider("vertical")}>Add Vertical Slicer</button>
+                <button className="button is-link" onClick={() => addDivider("horizontal")}>Add Horizontal Slicer</button>
+            </div>
+        </div>
+    );
+};
+
+export default ControlsPanel;

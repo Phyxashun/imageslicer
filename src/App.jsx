@@ -1,3 +1,4 @@
+/*
 import React, { useState, useRef } from 'react';
 import ImageDropZone from './components/ImageDropZone';
 import SpriteCanvas from './components/SpriteCanvas';
@@ -46,3 +47,45 @@ export default function App() {
         </div>
     );
 }
+*/
+
+import React, { useState } from "react";
+import { ThemeProvider, useTheme } from "./components/ThemeProvider";
+import ControlsPanel from "./components/ControlsPanel";
+import SpriteCanvas from "./components/SpriteCanvas";
+
+const AppContent = () => {
+    const [image, setImage] = useState(null);
+    const [dividers, setDividers] = useState({ vertical: [], horizontal: [] });
+    const { toggleTheme, theme } = useTheme();
+
+    return (
+        <div className="container mt-5">
+            <div className="buttons is-right">
+                <button className="button is-small is-dark" onClick={toggleTheme}>
+                    Toggle Theme
+                </button>
+            </div>
+            <div className="columns">
+                <div className="column is-one-third">
+                    <ControlsPanel
+                        onImageLoad={setImage}
+                        dividers={dividers}
+                        setDividers={setDividers}
+                    />
+                </div>
+                <div className="column">
+                    <SpriteCanvas image={image} dividers={dividers} setDividers={setDividers} />
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const App = () => (
+    <ThemeProvider>
+        <AppContent />
+    </ThemeProvider>
+);
+
+export default App;
