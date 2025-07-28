@@ -91,7 +91,11 @@ const AppContent = () => {
                     />
                 </div>
                 <div className='container is-fluid'>
-                    <SpriteCanvas image={image} dividers={dividers} setDividers={setDividers}/>
+                    <SpriteCanvas
+                        image={image}
+                        dividers={dividers}
+                        setDividers={setDividers}
+                    />
                 </div>
             </div>
         </div>
