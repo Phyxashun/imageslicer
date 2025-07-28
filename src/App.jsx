@@ -52,7 +52,6 @@ export default function App() {
 import React, {useState} from 'react';
 import { ThemeProvider, useTheme, useThemeUpdate } from './components/ThemeContext.jsx';
 import ControlsPanel from './components/ControlsPanel';
-import { saveAllSprites } from './utils/spriteSaver';
 import SpriteCanvas from './components/SpriteCanvas';
 
 import full_logo from '/full_logo.png';
