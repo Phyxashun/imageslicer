@@ -25,6 +25,10 @@ export function ThemeProvider({ children }) {
         document.documentElement.className = theme === 'theme-dark' ? 'theme-dark' : 'theme-light';
     }, [theme]);
 
+    useEffect(() => {
+        document.documentElement.className = theme === 'dark' ? 'dark' : 'light';
+    }, [theme]);
+
     function toggleTheme() {
         setTheme(t => (t === 'theme-dark' ? 'theme-light' : 'theme-dark'));
     }
