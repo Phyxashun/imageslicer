@@ -7,12 +7,12 @@ import { autoDetectGrid } from './utils/spriteScanner';
 import full_logo from '/full_logo.png';
 
 export default function App() {
-    const [imageBitmap, setImageBitmap] = useState(null);
+    const [image, setimage] = useState(null);
     const [spriteGrid, setSpriteGrid] = useState({ rows: 1, cols: 1 });
     const canvasRef = useRef(null);
 
     const handleImageLoad = async (bitmap) => {
-        setImageBitmap(bitmap);
+        setimage(bitmap);
         const auto = await autoDetectGrid(bitmap);
         setSpriteGrid(auto);
     };
@@ -21,17 +21,17 @@ export default function App() {
         <div className='app-container'>
             <img className='full-logo' src={full_logo} alt='logo' />
             <ImageDropZone onImageLoad={handleImageLoad} />
-            {imageBitmap && (
+            {image && (
                 <>
                     <SpriteCanvas
                         ref={canvasRef}
-                        imageBitmap={imageBitmap}
+                        image={image}
                         spriteGrid={spriteGrid}
                         setSpriteGrid={setSpriteGrid}
                         showGrid={false}
                         gridColor='lime'
-                        maxWidth={imageBitmap.width}
-                        maxHeight={imageBitmap.height}
+                        maxWidth={image.width}
+                        maxHeight={image.height}
                         enablePreview={true}
                         exportFormat='PNG'
                         exportQuality={100}
@@ -49,10 +49,12 @@ export default function App() {
 }
 */
 
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import { ThemeProvider, useTheme, useThemeUpdate } from './components/ThemeContext.jsx';
 import ControlsPanel from './components/ControlsPanel';
+import { saveAllSprites } from './utils/spriteSaver';
 import SpriteCanvas from './components/SpriteCanvas';
+
 import full_logo from '/full_logo.png';
 
 const AppContent = () => {
@@ -61,7 +63,7 @@ const AppContent = () => {
     const theme = useTheme();
     const toggleTheme = useThemeUpdate();
 
-    let appClass = 'container is-widescreen';
+    let appClass = 'app container is-widescreen';
     appClass += (theme === 'dark') ? 'theme-dark' : 'theme-light';
     console.log('APP CLASS:', appClass);
 

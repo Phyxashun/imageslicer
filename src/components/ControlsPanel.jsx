@@ -54,6 +54,7 @@ export default function ControlsPanel({ canvasRef, spriteGrid, setSpriteGrid }) 
 import React from "react";
 
 const ControlsPanel = ({ onImageLoad, dividers, setDividers }) => {
+
     const handleUpload = (e) => {
         const file = e.target.files[0];
         if (file) {
